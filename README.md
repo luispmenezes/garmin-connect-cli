@@ -1,186 +1,133 @@
 # garmin-connect-cli
 
-`garmin-connect-cli` is a Go command-line client for Garmin Connect.
+A small Go CLI for Garmin Connect.
 
-It is designed for scripts, terminals, and AI agents: compact JSON is written to stdout by default, while prompts, errors, and progress messages go to stderr. The CLI does not maintain a local activity database, sync cache, SQLite store, Parquet files, DuckDB state, or background task queue.
-
-## Status
-
-This project uses Garmin Connect's private web/mobile APIs. Those APIs are unofficial and can change without notice.
-
-Authentication and basic health data have been tested locally. Other commands follow Garmin endpoint behavior used by existing community clients, but may need adjustment if Garmin changes response shapes or routes.
+It logs in to your Garmin account and prints profile, activity, device, and health data as JSON by default, making it easy to use with tools like `jq` or shell scripts.
 
 ## Install
 
-Build from source:
+```bash
+go install github.com/luispmenezes/garmin-connect-cli/cmd/garmin@latest
+```
+
+Or build locally:
 
 ```bash
 go build -o garmin ./cmd/garmin
 ```
 
-Optionally install into your Go bin directory:
-
-```bash
-go install ./cmd/garmin
-```
-
-## Authentication
-
-Log in with your Garmin account:
+## Login
 
 ```bash
 garmin auth login --email user@example.com
 ```
 
-The password is prompted interactively and is not passed through argv. If Garmin requires MFA, the CLI prompts for the code.
+The CLI prompts for your password and MFA code when needed. Tokens are stored in your user config directory and can be removed with:
 
-Check auth status:
+```bash
+garmin auth logout
+```
+
+Check login status:
 
 ```bash
 garmin auth status --pretty
 ```
 
-Remove stored tokens:
+## Examples
+
+Get last night's sleep:
 
 ```bash
-garmin auth logout
-```
-
-OAuth tokens are stored as JSON files under the XDG config directory with `0600` file permissions. Profiles are supported with `--profile` or `GARMIN_PROFILE`.
-
-Examples:
-
-```bash
-garmin --profile personal auth status
-GARMIN_PROFILE=work garmin profile show
-```
-
-## Output Contract
-
-JSON is the stable scripting interface:
-
-```bash
-garmin health sleep
 garmin health sleep --pretty
 ```
 
-Human-readable tables are available where useful:
+List recent activities:
+
+```bash
+garmin activities list --limit 20
+```
+
+Show activities as a table:
 
 ```bash
 garmin activities list --format table
+```
+
+Download an activity:
+
+```bash
+garmin activities download ACTIVITY_ID --type fit --output activity.fit.zip
+```
+
+Show devices:
+
+```bash
 garmin devices list --format table
 ```
 
-Downloads are explicit file operations:
+Use a separate profile:
 
 ```bash
-garmin activities download 123456789 --type fit --output activity.fit.zip
-garmin activities download 123456789 --type gpx --output -
+garmin --profile personal health sleep
 ```
 
 ## Commands
 
-Authentication:
-
 ```bash
-garmin auth login
-garmin auth logout
-garmin auth status
+garmin auth login|logout|status
+garmin profile show|settings
+garmin activities list|get|download|upload
+garmin devices list|get
+garmin health summary|sleep|stress|heart-rate|body-battery|steps|calories|weight|weight-add
+garmin health vo2max|training-readiness|training-status|hrv|fitness-age
+garmin health lactate-threshold|race-predictions|endurance-score|hill-score
+garmin health spo2|respiration|intensity-minutes|blood-pressure|hydration
+garmin health personal-records|performance-summary|insights
 ```
 
-Profile:
+Run normal help:
 
 ```bash
-garmin profile show
-garmin profile settings
+garmin --help
+garmin health sleep --help
 ```
 
-Activities:
-
-```bash
-garmin activities list --limit 20
-garmin activities get ACTIVITY_ID
-garmin activities download ACTIVITY_ID --type fit --output activity.fit.zip
-garmin activities upload activity.fit
-```
-
-Devices:
-
-```bash
-garmin devices list
-garmin devices get DEVICE_ID
-```
-
-Health:
-
-```bash
-garmin health summary
-garmin health sleep
-garmin health stress
-garmin health heart-rate
-garmin health body-battery
-garmin health steps
-garmin health calories
-garmin health weight
-garmin health weight-add 80.2 --unit kg
-garmin health vo2max
-garmin health training-readiness
-garmin health training-status
-garmin health hrv
-garmin health fitness-age
-garmin health lactate-threshold
-garmin health race-predictions
-garmin health endurance-score
-garmin health hill-score
-garmin health spo2
-garmin health respiration
-garmin health intensity-minutes
-garmin health blood-pressure
-garmin health hydration
-garmin health personal-records
-garmin health performance-summary
-garmin health insights
-```
-
-There is intentionally no `sync` command and no `devices history` command.
-
-## AI Agent Help
-
-Use `help-json` for machine-readable command discovery:
+Machine-readable help is also available:
 
 ```bash
 garmin help-json
 garmin help-json health sleep
-garmin help-json activities download
 ```
 
-This returns command paths, arguments, flags, defaults, required flags, global flags, examples, and unavailable commands.
+## Output
+
+The default output is compact JSON:
+
+```bash
+garmin health sleep
+```
+
+Use `--pretty` for indented JSON:
+
+```bash
+garmin health sleep --pretty
+```
+
+Use `--format table` where a human summary is useful:
+
+```bash
+garmin devices list --format table
+```
 
 ## Development
 
-Run tests:
-
 ```bash
 go test ./...
-```
-
-Run vet:
-
-```bash
 go vet ./...
-```
-
-Build:
-
-```bash
 go build -o garmin ./cmd/garmin
 ```
 
-## Design Goals
+## Note
 
-- JSON-first output for composition with tools like `jq`.
-- No local Garmin data warehouse or sync subsystem.
-- Explicit file output only for downloads.
-- Minimal response modeling to avoid overfitting unstable private APIs.
-- Profile-aware token persistence only.
-- Help output that is usable by both humans and AI agents.
+Garmin Connect does not provide an official public API for this use case. This CLI uses Garmin's private web/mobile endpoints, so commands may need updates if Garmin changes them.
