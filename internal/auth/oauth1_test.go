@@ -31,3 +31,16 @@ func TestParseOAuthResponse(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", got)
 	}
 }
+
+func TestNormalizedParameterStringPreservesDuplicateParameters(t *testing.T) {
+	got := normalizedParameterString([]oauthParam{
+		{key: "a", value: "2"},
+		{key: "oauth_nonce", value: "nonce"},
+		{key: "a", value: "1"},
+		{key: "space", value: "a b"},
+	})
+	want := "a=1&a=2&oauth_nonce=nonce&space=a%20b"
+	if got != want {
+		t.Fatalf("normalized params = %q, want %q", got, want)
+	}
+}

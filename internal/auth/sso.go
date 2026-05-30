@@ -49,7 +49,9 @@ func (c *SSOClient) Login(email, password string, mfa MFAFunc) (OAuth1Token, OAu
 	signInURL := fmt.Sprintf("https://sso.%s/mobile/sso/en/sign-in?clientId=%s", c.domain, url.QueryEscape(clientID))
 	req, _ := http.NewRequest(http.MethodGet, signInURL, nil)
 	addSSOPageHeaders(req)
-	_, _ = c.http.Do(req)
+	if err := c.startSession(req); err != nil {
+		return OAuth1Token{}, OAuth2Token{}, err
+	}
 
 	loginBody := map[string]any{
 		"username":     email,
@@ -91,6 +93,19 @@ func (c *SSOClient) Login(email, password string, mfa MFAFunc) (OAuth1Token, OAu
 		return OAuth1Token{}, OAuth2Token{}, errors.New("SSO login response did not include service ticket")
 	}
 	return c.completeLogin(ticket)
+}
+
+func (c *SSOClient) startSession(req *http.Request) error {
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("start SSO session: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		data, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("start SSO session: HTTP %d: %s", resp.StatusCode, truncateBody(data))
+	}
+	return nil
 }
 
 func (c *SSOClient) RefreshOAuth2(oauth1 OAuth1Token) (OAuth2Token, error) {

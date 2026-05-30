@@ -36,6 +36,23 @@ func TestExpectedCommandsAvailable(t *testing.T) {
 	}
 }
 
+func TestWeightAddValidatesArgsBeforeAuth(t *testing.T) {
+	root := NewRootCommand()
+	root.SetArgs([]string{"health", "weight-add"})
+	err := root.Execute()
+	if err == nil || err.Error() != `accepts 1 arg(s), received 0` {
+		t.Fatalf("expected missing argument error, got %v", err)
+	}
+}
+
+func TestApplyDisplayNameEscapesPathSegment(t *testing.T) {
+	got := applyDisplayName("/wellness/{displayName}/daily", "Luis Menezes/QA")
+	want := "/wellness/Luis%20Menezes%2FQA/daily"
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
 func findSubcommand(cmd commandLister, name string) commandLister {
 	for _, child := range cmd.Commands() {
 		if child.Name() == name {

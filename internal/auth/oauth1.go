@@ -27,6 +27,11 @@ type OAuth1Signer struct {
 	Token    *OAuthToken
 }
 
+type oauthParam struct {
+	key   string
+	value string
+}
+
 func (s OAuth1Signer) Sign(method, rawURL string, extra map[string]string) (string, error) {
 	nonce, err := nonce()
 	if err != nil {
@@ -51,17 +56,17 @@ func (s OAuth1Signer) SignWithTimestampNonce(method, rawURL string, extra map[st
 	if s.Token != nil {
 		oauth["oauth_token"] = s.Token.Token
 	}
-	params := make(map[string]string, len(oauth)+len(extra)+len(u.Query()))
+	params := make([]oauthParam, 0, len(oauth)+len(extra)+len(u.Query()))
 	for k, v := range oauth {
-		params[k] = v
+		params = append(params, oauthParam{key: k, value: v})
 	}
 	for k, values := range u.Query() {
-		if len(values) > 0 {
-			params[k] = values[0]
+		for _, value := range values {
+			params = append(params, oauthParam{key: k, value: value})
 		}
 	}
 	for k, v := range extra {
-		params[k] = v
+		params = append(params, oauthParam{key: k, value: v})
 	}
 	oauth["oauth_signature"] = s.signature(method, baseURL, params)
 	keys := make([]string, 0, len(oauth))
@@ -76,17 +81,9 @@ func (s OAuth1Signer) SignWithTimestampNonce(method, rawURL string, extra map[st
 	return "OAuth " + strings.Join(parts, ", "), nil
 }
 
-func (s OAuth1Signer) signature(method, baseURL string, params map[string]string) string {
-	keys := make([]string, 0, len(params))
-	for k := range params {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	pairs := make([]string, 0, len(keys))
-	for _, k := range keys {
-		pairs = append(pairs, percentEncode(k)+"="+percentEncode(params[k]))
-	}
-	base := strings.ToUpper(method) + "&" + percentEncode(baseURL) + "&" + percentEncode(strings.Join(pairs, "&"))
+func (s OAuth1Signer) signature(method, baseURL string, params []oauthParam) string {
+	paramString := normalizedParameterString(params)
+	base := strings.ToUpper(method) + "&" + percentEncode(baseURL) + "&" + percentEncode(paramString)
 	tokenSecret := ""
 	if s.Token != nil {
 		tokenSecret = s.Token.Secret
@@ -95,6 +92,24 @@ func (s OAuth1Signer) signature(method, baseURL string, params map[string]string
 	mac := hmac.New(sha1.New, []byte(key))
 	mac.Write([]byte(base))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func normalizedParameterString(params []oauthParam) string {
+	encoded := make([]oauthParam, 0, len(params))
+	for _, param := range params {
+		encoded = append(encoded, oauthParam{key: percentEncode(param.key), value: percentEncode(param.value)})
+	}
+	sort.Slice(encoded, func(i, j int) bool {
+		if encoded[i].key == encoded[j].key {
+			return encoded[i].value < encoded[j].value
+		}
+		return encoded[i].key < encoded[j].key
+	})
+	pairs := make([]string, 0, len(encoded))
+	for _, param := range encoded {
+		pairs = append(pairs, param.key+"="+param.value)
+	}
+	return strings.Join(pairs, "&")
 }
 
 func ParseOAuthResponse(body string) map[string]string {

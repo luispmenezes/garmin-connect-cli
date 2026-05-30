@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -310,7 +311,7 @@ func (a *app) healthMetricCommand(spec healthSpec) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				path = strings.ReplaceAll(path, "{displayName}", displayName)
+				path = applyDisplayName(path, displayName)
 			}
 			if spec.post {
 				if len(args) != 1 {
@@ -359,6 +360,7 @@ func (a *app) healthMetricCommand(spec healthSpec) *cobra.Command {
 	}
 	if spec.post {
 		cmd.Flags().StringVar(&unit, "unit", "kg", "weight unit")
+		cmd.Args = cobra.ExactArgs(1)
 	}
 	return cmd
 }
@@ -397,4 +399,8 @@ func weightGrams(weight float64, unit string) (int64, error) {
 	default:
 		return 0, errors.New("invalid unit; use kg or lbs")
 	}
+}
+
+func applyDisplayName(path, displayName string) string {
+	return strings.ReplaceAll(path, "{displayName}", url.PathEscape(displayName))
 }
