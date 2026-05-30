@@ -44,7 +44,37 @@ func (c *Client) PostJSON(token auth.OAuth2Token, path string, body any) (json.R
 	if err != nil {
 		return nil, err
 	}
+	return c.PostRawJSON(token, path, data)
+}
+
+func (c *Client) PostRawJSON(token auth.OAuth2Token, path string, data []byte) (json.RawMessage, error) {
 	resp, err := c.do(token, http.MethodPost, path, bytes.NewReader(data), "application/json")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) PutJSON(token auth.OAuth2Token, path string, body any) (json.RawMessage, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.PutRawJSON(token, path, data)
+}
+
+func (c *Client) PutRawJSON(token auth.OAuth2Token, path string, data []byte) (json.RawMessage, error) {
+	resp, err := c.do(token, http.MethodPut, path, bytes.NewReader(data), "application/json")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) DeleteJSON(token auth.OAuth2Token, path string) (json.RawMessage, error) {
+	resp, err := c.do(token, http.MethodDelete, path, nil, "")
 	if err != nil {
 		return nil, err
 	}

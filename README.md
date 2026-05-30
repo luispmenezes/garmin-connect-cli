@@ -66,6 +66,21 @@ Show devices:
 garmin devices list --format table
 ```
 
+List workouts and scheduled workout summaries:
+
+```bash
+garmin workouts list --pretty
+garmin calendar workouts --start 2026-06-01 --pretty
+```
+
+Create a workout from Garmin JSON:
+
+```bash
+garmin workouts create examples/workout-running-minimal.json
+```
+
+The example workout is intentionally a raw Garmin payload for manual testing. Garmin may reject incomplete segment structures, and the CLI sends the file contents unchanged.
+
 Use a separate profile:
 
 ```bash
@@ -84,6 +99,8 @@ garmin health vo2max|training-readiness|training-status|hrv|fitness-age
 garmin health lactate-threshold|race-predictions|endurance-score|hill-score
 garmin health spo2|respiration|intensity-minutes|blood-pressure|hydration
 garmin health personal-records|performance-summary|insights
+garmin workouts list|get|create|update|delete|schedule|schedule-get|unschedule
+garmin calendar workouts
 ```
 
 Run normal help:

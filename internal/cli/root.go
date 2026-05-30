@@ -37,7 +37,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&a.profile, "profile", "", "credential profile (defaults to GARMIN_PROFILE or default)")
 	root.PersistentFlags().StringVar(&a.format, "format", "json", "output format: json or table")
 	root.PersistentFlags().BoolVar(&a.pretty, "pretty", false, "pretty-print JSON output")
-	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.devicesCommand(), a.healthCommand(), a.versionCommand())
+	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.devicesCommand(), a.healthCommand(), a.workoutsCommand(), a.calendarCommand(), a.versionCommand())
 	root.AddCommand(a.helpJSONCommand(root))
 	return root
 }
