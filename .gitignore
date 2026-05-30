@@ -1,0 +1,35 @@
+# Build outputs
+/garmin
+/bin/
+/dist/
+
+# Go
+/coverage.out
+/*.test
+
+# Vendored dependencies are not committed by default.
+/vendor/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+
+# AI assistant/tooling state
+/.agents/
+/.ai/
+/.claude/
+/.codex/
+/.cursor/
+/.continue/
+/.aider*
+/.windsurf/
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/.github/copilot-instructions.md
