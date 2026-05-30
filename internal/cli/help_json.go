@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/luispmenezes/garmin-connect-cli/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -48,7 +49,7 @@ func (a *app) helpJSONCommand(root *cobra.Command) *cobra.Command {
 			docs := collectDocs(target)
 			return a.out().WriteValue(map[string]any{
 				"binary":      "garmin",
-				"version":     "0.1.0",
+				"version":     version.Version,
 				"output":      "JSON is the stable scripting contract. Errors, prompts, and progress go to stderr.",
 				"commands":    docs,
 				"unavailable": []string{"sync", "devices history"},

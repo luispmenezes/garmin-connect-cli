@@ -29,6 +29,7 @@ func TestExpectedCommandsAvailable(t *testing.T) {
 		{"devices", "list"},
 		{"health", "training-readiness"},
 		{"health", "weight-add"},
+		{"version"},
 	} {
 		if _, _, err := root.Find(args); err != nil {
 			t.Fatalf("%v missing: %v", args, err)

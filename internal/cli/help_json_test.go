@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
+
+	"github.com/luispmenezes/garmin-connect-cli/internal/version"
+	"github.com/spf13/cobra"
 )
 
 func TestHelpJSONIncludesAgentMetadata(t *testing.T) {
@@ -33,5 +37,33 @@ func TestHelpJSONIncludesAgentMetadata(t *testing.T) {
 	}
 	if !foundOutput {
 		t.Fatal("output flag missing")
+	}
+}
+
+func TestHelpJSONUsesInjectedVersion(t *testing.T) {
+	previous := version.Version
+	version.Version = "9.8.7-test"
+	t.Cleanup(func() { version.Version = previous })
+
+	var out bytes.Buffer
+	a := &app{stdout: &out}
+	root := &cobra.Command{Use: "garmin"}
+	root.AddCommand(a.helpJSONCommand(root))
+	cmd, _, err := root.Find([]string{"help-json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var doc struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Version != "9.8.7-test" {
+		t.Fatalf("version = %q", doc.Version)
 	}
 }

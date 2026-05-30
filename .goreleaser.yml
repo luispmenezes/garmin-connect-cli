@@ -1,0 +1,46 @@
+version: 2
+
+project_name: garmin
+
+builds:
+  - id: garmin
+    main: ./cmd/garmin
+    binary: garmin
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X github.com/luispmenezes/garmin-connect-cli/internal/version.Version={{ .Version }} -X github.com/luispmenezes/garmin-connect-cli/internal/version.Commit={{ .Commit }} -X github.com/luispmenezes/garmin-connect-cli/internal/version.Date={{ .Date }}
+
+archives:
+  - id: garmin
+    builds:
+      - garmin
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  disable: true
+
+release:
+  mode: append

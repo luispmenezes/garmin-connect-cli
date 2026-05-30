@@ -13,6 +13,7 @@ import (
 	"github.com/luispmenezes/garmin-connect-cli/internal/auth"
 	"github.com/luispmenezes/garmin-connect-cli/internal/garmin"
 	"github.com/luispmenezes/garmin-connect-cli/internal/output"
+	"github.com/luispmenezes/garmin-connect-cli/internal/version"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -36,7 +37,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&a.profile, "profile", "", "credential profile (defaults to GARMIN_PROFILE or default)")
 	root.PersistentFlags().StringVar(&a.format, "format", "json", "output format: json or table")
 	root.PersistentFlags().BoolVar(&a.pretty, "pretty", false, "pretty-print JSON output")
-	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.devicesCommand(), a.healthCommand())
+	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.devicesCommand(), a.healthCommand(), a.versionCommand())
 	root.AddCommand(a.helpJSONCommand(root))
 	return root
 }
@@ -59,6 +60,17 @@ func (a *app) api() (*garmin.Client, auth.OAuth2Token, error) {
 		return nil, auth.OAuth2Token{}, err
 	}
 	return garmin.NewClient(), token, nil
+}
+
+func (a *app) versionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.out().WriteValue(version.Get())
+		},
+	}
 }
 
 func (a *app) writeRawOrTable(data []byte, table func([]byte) ([][]string, []string, error)) error {
