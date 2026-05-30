@@ -44,6 +44,38 @@ func ProfilePath() string { return "/userprofile-service/socialProfile" }
 
 func SettingsPath() string { return "/userprofile-service/userprofile/user-settings" }
 
+func WorkoutListPath() string { return "/workout-service/workouts" }
+
+func WorkoutGetPath(id string) string {
+	return "/workout-service/workout/" + url.PathEscape(id) + "?includeAudioNotes=false"
+}
+
+func WorkoutCreatePath() string { return "/workout-service/workout" }
+
+func WorkoutUpdatePath(id string) string {
+	return "/workout-service/workout/" + url.PathEscape(id)
+}
+
+func WorkoutDeletePath(id string) string {
+	return "/workout-service/workout/" + url.PathEscape(id)
+}
+
+func WorkoutSchedulePath(workoutID string) string {
+	return "/workout-service/schedule/" + url.PathEscape(workoutID)
+}
+
+func WorkoutScheduleGetPath(scheduleID string) string {
+	return "/workout-service/schedule/" + url.PathEscape(scheduleID) + "?includeAudioNotes=false"
+}
+
+func WorkoutUnschedulePath(scheduleID string) string {
+	return "/workout-service/schedule/" + url.PathEscape(scheduleID)
+}
+
+func CalendarWorkoutSummaryPath(startDate string) string {
+	return "/calendar-service/workout/schedule/summary/?startDate=" + url.QueryEscape(startDate)
+}
+
 func Today() string { return time.Now().Format("2006-01-02") }
 
 func AddDays(date string, days int) (string, error) {
