@@ -68,7 +68,10 @@ func healthSpecs() []healthSpec {
 		{"weight-add WEIGHT", "Add weight", true, false, 0, false, true, func(date, _, _ string, _ int, _ []string) (string, error) {
 			return "/weight-service/user-weight", nil
 		}},
-		{"vo2max", "VO2 max", true, false, 0, false, false, dated("/metrics-service/metrics/vo2max/%s")},
+		{"vo2max", "VO2 max", true, false, 0, false, false, func(date, _, _ string, _ int, _ []string) (string, error) {
+			d := url.PathEscape(dateOrToday(date))
+			return fmt.Sprintf("/metrics-service/metrics/maxmet/daily/%s/%s", d, d), nil
+		}},
 		{"training-readiness", "Training readiness", true, true, 7, false, false, rangePath("/metrics-service/metrics/trainingreadiness/%s/%s", 7)},
 		{"training-status", "Training status", true, true, 7, false, false, rangePath("/metrics-service/metrics/trainingstatus/%s/%s", 7)},
 		{"hrv", "HRV data", true, false, 0, false, false, dated("/hrv-service/hrv/%s")},
