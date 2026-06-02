@@ -66,6 +66,14 @@ Show devices:
 garmin devices list --format table
 ```
 
+Get VO2 max over a date range (defaults to the last 7 days):
+
+```bash
+garmin health vo2max --pretty
+garmin health vo2max --days 30
+garmin health vo2max --from 2026-05-01 --to 2026-05-31
+```
+
 List workouts and scheduled workout summaries:
 
 ```bash
