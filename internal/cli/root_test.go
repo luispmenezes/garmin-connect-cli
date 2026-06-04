@@ -26,6 +26,8 @@ func TestExpectedCommandsAvailable(t *testing.T) {
 		{"auth", "login"},
 		{"profile", "show"},
 		{"activities", "download"},
+		{"activities", "splits"},
+		{"activities", "stats"},
 		{"devices", "list"},
 		{"health", "training-readiness"},
 		{"health", "weight-add"},

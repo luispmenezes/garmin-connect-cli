@@ -54,6 +54,13 @@ Show activities as a table:
 garmin activities list --format table
 ```
 
+Show per-lap splits and split summary stats for an activity:
+
+```bash
+garmin activities splits ACTIVITY_ID --format table
+garmin activities stats ACTIVITY_ID --format table
+```
+
 Download an activity:
 
 ```bash
@@ -100,7 +107,7 @@ garmin --profile personal health sleep
 ```bash
 garmin auth login|logout|status
 garmin profile show|settings
-garmin activities list|get|download|upload
+garmin activities list|get|splits|stats|download|upload
 garmin devices list|get
 garmin health summary|sleep|stress|heart-rate|body-battery|steps|calories|weight|weight-add
 garmin health vo2max|training-readiness|training-status|hrv|fitness-age

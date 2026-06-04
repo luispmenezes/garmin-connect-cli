@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/luispmenezes/garmin-connect-cli/internal/output"
 )
@@ -25,6 +26,49 @@ func activitiesTable(data []byte) ([][]string, []string, error) {
 		})
 	}
 	return rows, []string{"ID", "Date", "Type", "Distance", "Duration", "HR"}, nil
+}
+
+func activitySplitsTable(data []byte, unit speedUnit) ([][]string, []string, error) {
+	var obj struct {
+		LapDTOs []map[string]any `json:"lapDTOs"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil, nil, err
+	}
+	rows := make([][]string, 0, len(obj.LapDTOs))
+	for _, l := range obj.LapDTOs {
+		rows = append(rows, []string{
+			valueString(l, "lapIndex"),
+			distanceKM(l["distance"]),
+			duration(l["duration"]),
+			paceOrSpeed(l["distance"], l["duration"], unit),
+			valueString(l, "averageHR"),
+			elevation(l["elevationGain"]),
+		})
+	}
+	return rows, []string{"Lap", "Distance", "Duration", speedHeader(unit), "HR", "Ascent"}, nil
+}
+
+func activityStatsTable(data []byte, unit speedUnit) ([][]string, []string, error) {
+	var obj struct {
+		SplitSummaries []map[string]any `json:"splitSummaries"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil, nil, err
+	}
+	rows := make([][]string, 0, len(obj.SplitSummaries))
+	for _, s := range obj.SplitSummaries {
+		rows = append(rows, []string{
+			valueString(s, "splitType"),
+			valueString(s, "noOfSplits"),
+			distanceKM(s["distance"]),
+			duration(s["duration"]),
+			paceOrSpeed(s["distance"], s["duration"], unit),
+			valueString(s, "averageHR"),
+			elevation(s["elevationGain"]),
+		})
+	}
+	return rows, []string{"Type", "Splits", "Distance", "Duration", speedHeader(unit), "HR", "Ascent"}, nil
 }
 
 func devicesTable(data []byte) ([][]string, []string, error) {
@@ -155,4 +199,79 @@ func duration(v any) string {
 	}
 	sec := int(f)
 	return fmt.Sprintf("%d:%02d:%02d", sec/3600, (sec%3600)/60, sec%60)
+}
+
+// speedUnit selects how distance-over-time is rendered, matching the Garmin
+// app's per-sport convention: pace (min/km) for foot sports, speed (km/h) for
+// cycling, and pace per 100m for swimming.
+type speedUnit int
+
+const (
+	pacePerKM speedUnit = iota
+	speedKMH
+	pacePer100m
+)
+
+// speedUnitForType maps a Garmin activity typeKey (e.g. "running",
+// "road_biking", "lap_swimming") to its display unit. typeKeys have many
+// variants, so it matches on substrings rather than an exhaustive list.
+func speedUnitForType(typeKey string) speedUnit {
+	k := strings.ToLower(typeKey)
+	switch {
+	case strings.Contains(k, "cycling"), strings.Contains(k, "biking"), strings.Contains(k, "bike"):
+		return speedKMH
+	case strings.Contains(k, "swim"):
+		return pacePer100m
+	default:
+		return pacePerKM
+	}
+}
+
+// speedUnitFromActivity derives the display unit from an activity-detail
+// payload (/activity-service/activity/{id}). On any parse failure it falls back
+// to pace per km.
+func speedUnitFromActivity(data []byte) speedUnit {
+	var obj struct {
+		ActivityTypeDTO struct {
+			TypeKey string `json:"typeKey"`
+		} `json:"activityTypeDTO"`
+	}
+	_ = json.Unmarshal(data, &obj)
+	return speedUnitForType(obj.ActivityTypeDTO.TypeKey)
+}
+
+func speedHeader(unit speedUnit) string {
+	if unit == speedKMH {
+		return "Speed"
+	}
+	return "Pace"
+}
+
+func paceOrSpeed(distance, dur any, unit speedUnit) string {
+	d, ok := distance.(float64)
+	if !ok || d <= 0 {
+		return "-"
+	}
+	t, ok := dur.(float64)
+	if !ok || t <= 0 {
+		return "-"
+	}
+	switch unit {
+	case speedKMH:
+		return fmt.Sprintf("%.1f km/h", (d/1000)/(t/3600))
+	case pacePer100m:
+		sec := int(t / (d / 100))
+		return fmt.Sprintf("%d:%02d /100m", sec/60, sec%60)
+	default:
+		sec := int(t / (d / 1000))
+		return fmt.Sprintf("%d:%02d /km", sec/60, sec%60)
+	}
+}
+
+func elevation(v any) string {
+	f, ok := v.(float64)
+	if !ok {
+		return "-"
+	}
+	return fmt.Sprintf("%.0f m", f)
 }

@@ -19,6 +19,14 @@ func ActivityGetPath(id string) string {
 	return "/activity-service/activity/" + url.PathEscape(id)
 }
 
+func ActivitySplitsPath(id string) string {
+	return "/activity-service/activity/" + url.PathEscape(id) + "/splits"
+}
+
+func ActivityStatsPath(id string) string {
+	return "/activity-service/activity/" + url.PathEscape(id) + "/split_summaries"
+}
+
 func ActivityDownloadEndpoint(id, typ string) (DownloadEndpoint, error) {
 	switch typ {
 	case "fit":
