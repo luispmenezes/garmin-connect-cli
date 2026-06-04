@@ -237,6 +237,50 @@ func (a *app) activitiesCommand() *cobra.Command {
 			return a.writeRawOrTable(data, genericKVTable)
 		},
 	}
+	splits := &cobra.Command{
+		Use:   "splits ACTIVITY_ID",
+		Short: "Show activity splits",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, token, err := a.api()
+			if err != nil {
+				return err
+			}
+			data, err := client.GetJSON(token, garmin.ActivitySplitsPath(args[0]))
+			if err != nil {
+				return err
+			}
+			return a.writeRawOrTable(data, func(b []byte) ([][]string, []string, error) {
+				unit, err := a.activitySpeedUnit(client, token, args[0])
+				if err != nil {
+					return nil, nil, err
+				}
+				return activitySplitsTable(b, unit)
+			})
+		},
+	}
+	stats := &cobra.Command{
+		Use:   "stats ACTIVITY_ID",
+		Short: "Show activity split summary stats",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, token, err := a.api()
+			if err != nil {
+				return err
+			}
+			data, err := client.GetJSON(token, garmin.ActivityStatsPath(args[0]))
+			if err != nil {
+				return err
+			}
+			return a.writeRawOrTable(data, func(b []byte) ([][]string, []string, error) {
+				unit, err := a.activitySpeedUnit(client, token, args[0])
+				if err != nil {
+					return nil, nil, err
+				}
+				return activityStatsTable(b, unit)
+			})
+		},
+	}
 	var downloadType, downloadOutput string
 	download := &cobra.Command{
 		Use:   "download ACTIVITY_ID",
@@ -289,7 +333,7 @@ func (a *app) activitiesCommand() *cobra.Command {
 			return a.out().WriteJSON(data)
 		},
 	}
-	cmd.AddCommand(list, get, download, upload)
+	cmd.AddCommand(list, get, splits, stats, download, upload)
 	return cmd
 }
 
@@ -375,6 +419,17 @@ func (a *app) healthMetricCommand(spec healthSpec) *cobra.Command {
 		cmd.Args = cobra.ExactArgs(1)
 	}
 	return cmd
+}
+
+// activitySpeedUnit fetches an activity's type and returns the unit used to
+// render pace/speed in tables. It is only called in table mode, so JSON output
+// avoids the extra request.
+func (a *app) activitySpeedUnit(client *garmin.Client, token auth.OAuth2Token, id string) (speedUnit, error) {
+	data, err := client.GetJSON(token, garmin.ActivityGetPath(id))
+	if err != nil {
+		return pacePerKM, err
+	}
+	return speedUnitFromActivity(data), nil
 }
 
 func (a *app) getCommand(use, short, path string, table func([]byte) ([][]string, []string, error)) *cobra.Command {

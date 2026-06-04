@@ -15,6 +15,15 @@ func TestActivityDownloadEndpoint(t *testing.T) {
 	}
 }
 
+func TestActivityEndpoints(t *testing.T) {
+	if got := ActivitySplitsPath("activity 1/2"); got != "/activity-service/activity/activity%201%2F2/splits" {
+		t.Fatalf("splits path = %q", got)
+	}
+	if got := ActivityStatsPath("activity 1/2"); got != "/activity-service/activity/activity%201%2F2/split_summaries" {
+		t.Fatalf("stats path = %q", got)
+	}
+}
+
 func TestAddDays(t *testing.T) {
 	got, err := AddDays("2026-05-30", -6)
 	if err != nil {
