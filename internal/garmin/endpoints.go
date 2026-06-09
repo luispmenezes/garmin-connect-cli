@@ -42,6 +42,23 @@ func ActivityDownloadEndpoint(id, typ string) (DownloadEndpoint, error) {
 	}
 }
 
+func CourseListPath() string { return "/web-gateway/course/owner" }
+
+func CourseGetPath(id string) string {
+	return "/course-service/course/" + url.PathEscape(id)
+}
+
+// CourseImportPath parses an uploaded GPX/FIT/TCX file into a (transient)
+// course detail. The format is inferred by Garmin from the uploaded filename's
+// extension. The parsed detail must then be POSTed to CourseSavePath to persist.
+func CourseImportPath() string { return "/course-service/course/import" }
+
+func CourseSavePath() string { return "/course-service/course/" }
+
+func CourseDeletePath(id string) string {
+	return "/course-service/course/" + url.PathEscape(id)
+}
+
 func DeviceListPath() string { return "/device-service/deviceregistration/devices" }
 
 func DeviceGetPath(id string) string {

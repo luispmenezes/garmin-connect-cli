@@ -24,6 +24,24 @@ func TestActivityEndpoints(t *testing.T) {
 	}
 }
 
+func TestCourseEndpoints(t *testing.T) {
+	if got := CourseListPath(); got != "/web-gateway/course/owner" {
+		t.Fatalf("list path = %q", got)
+	}
+	if got := CourseImportPath(); got != "/course-service/course/import" {
+		t.Fatalf("import path = %q", got)
+	}
+	if got := CourseSavePath(); got != "/course-service/course/" {
+		t.Fatalf("save path = %q", got)
+	}
+	if got := CourseGetPath("123/4"); got != "/course-service/course/123%2F4" {
+		t.Fatalf("get path = %q", got)
+	}
+	if got := CourseDeletePath("123/4"); got != "/course-service/course/123%2F4" {
+		t.Fatalf("delete path = %q", got)
+	}
+}
+
 func TestAddDays(t *testing.T) {
 	got, err := AddDays("2026-05-30", -6)
 	if err != nil {

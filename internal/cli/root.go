@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -37,7 +39,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().StringVar(&a.profile, "profile", "", "credential profile (defaults to GARMIN_PROFILE or default)")
 	root.PersistentFlags().StringVar(&a.format, "format", "json", "output format: json or table")
 	root.PersistentFlags().BoolVar(&a.pretty, "pretty", false, "pretty-print JSON output")
-	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.devicesCommand(), a.healthCommand(), a.workoutsCommand(), a.calendarCommand(), a.versionCommand())
+	root.AddCommand(a.authCommand(), a.profileCommand(), a.activitiesCommand(), a.coursesCommand(), a.devicesCommand(), a.healthCommand(), a.workoutsCommand(), a.calendarCommand(), a.versionCommand())
 	root.AddCommand(a.helpJSONCommand(root))
 	return root
 }
@@ -199,6 +201,152 @@ func (a *app) devicesCommand() *cobra.Command {
 	}
 	cmd.AddCommand(get)
 	return cmd
+}
+
+func (a *app) coursesCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "courses", Short: "Manage Garmin courses"}
+	cmd.AddCommand(a.getCommand("list", "List courses", garmin.CourseListPath(), coursesTable))
+	get := &cobra.Command{
+		Use:   "get COURSE_ID",
+		Short: "Show course details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, token, err := a.api()
+			if err != nil {
+				return err
+			}
+			data, err := client.GetJSON(token, garmin.CourseGetPath(args[0]))
+			if err != nil {
+				return err
+			}
+			return a.writeRawOrTable(data, genericKVTable)
+		},
+	}
+	var parseOnly bool
+	var activityType, privacy int
+	importCmd := &cobra.Command{
+		Use:   "import FILE",
+		Short: "Import a GPX/FIT/TCX file as a course",
+		Long:  "Import a route file (format inferred from the file extension) as a Garmin Connect course. Parses the file then saves the course unless --parse-only is set.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(args[0])), ".")
+			switch ext {
+			case "gpx", "fit", "tcx":
+			case "":
+				return errors.New("file has no extension; Garmin infers the course format from it (use a .gpx/.fit/.tcx filename)")
+			default:
+				return fmt.Errorf("unsupported course format %q; supported: gpx, fit, tcx", ext)
+			}
+			client, token, err := a.api()
+			if err != nil {
+				return err
+			}
+			// Step 1: parse the file into a transient course detail.
+			parsed, err := client.Upload(token, garmin.CourseImportPath(), args[0])
+			if err != nil {
+				return err
+			}
+			if parseOnly {
+				return a.out().WriteJSON(parsed)
+			}
+			// Step 2: persist the parsed detail as a saved course.
+			payload, err := courseSavePayload(parsed, activityType, privacy)
+			if err != nil {
+				return err
+			}
+			saved, err := client.PostRawJSON(token, garmin.CourseSavePath(), payload)
+			if err != nil {
+				return err
+			}
+			return a.out().WriteJSON(saved)
+		},
+	}
+	importCmd.Flags().BoolVar(&parseOnly, "parse-only", false, "only parse the file and print the transient course detail, without saving")
+	importCmd.Flags().IntVar(&activityType, "activity-type", 10, "course activity type: 1=running, 3=hiking, 5=mountain_biking, 6=trail_running, 10=road_biking, 143=gravel_cycling")
+	importCmd.Flags().IntVar(&privacy, "privacy", 2, "privacy rule: 1=public, 2=private, 4=group")
+	del := &cobra.Command{
+		Use:   "delete COURSE_ID",
+		Short: "Delete a course",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, token, err := a.api()
+			if err != nil {
+				return err
+			}
+			if _, err := client.DeleteJSON(token, garmin.CourseDeletePath(args[0])); err != nil {
+				return err
+			}
+			return a.out().WriteValue(map[string]any{"deleted": true, "courseId": args[0]})
+		},
+	}
+	cmd.AddCommand(get, importCmd, del)
+	return cmd
+}
+
+// courseSavePayload turns the transient course detail returned by the import
+// (parse) endpoint into a payload the save endpoint accepts. The parse step
+// returns geoPoints but leaves the derived metadata null (startPoint,
+// boundingBox, distance, elevation), which the save endpoint rejects — so we
+// compute them from the points here, mirroring the Garmin web import flow.
+func courseSavePayload(parsed []byte, activityType, privacy int) ([]byte, error) {
+	var d map[string]any
+	if err := json.Unmarshal(parsed, &d); err != nil {
+		return nil, fmt.Errorf("parse course detail: %w", err)
+	}
+	pts, _ := d["geoPoints"].([]any)
+	if len(pts) < 2 {
+		return nil, errors.New("import returned fewer than two course points; the file may be empty or invalid")
+	}
+	var minLat, maxLat, minLng, maxLng, lastDist float64
+	var startLat, startLng, startEle float64
+	for i, raw := range pts {
+		p, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		lat, _ := p["latitude"].(float64)
+		lng, _ := p["longitude"].(float64)
+		// The parse step returns null elevations (Garmin fills them from its
+		// DEM server-side); coerce to 0 so the float field validates.
+		ele, _ := p["elevation"].(float64)
+		p["elevation"] = ele
+		if dist, ok := p["distance"].(float64); ok {
+			lastDist = dist
+		}
+		if i == 0 {
+			minLat, maxLat, minLng, maxLng = lat, lat, lng, lng
+			startLat, startLng, startEle = lat, lng, ele
+			continue
+		}
+		minLat, maxLat = min(minLat, lat), max(maxLat, lat)
+		minLng, maxLng = min(minLng, lng), max(maxLng, lng)
+	}
+	d["activityTypePk"] = activityType
+	d["rulePK"] = privacy
+	d["sourceTypeId"] = 3 // GPX import
+	if s, _ := d["coordinateSystem"].(string); s == "" {
+		d["coordinateSystem"] = "WGS84"
+	}
+	d["startPoint"] = map[string]any{"latitude": startLat, "longitude": startLng, "elevation": startEle}
+	d["boundingBox"] = map[string]any{
+		"lowerLeft":           map[string]any{"latitude": minLat, "longitude": minLng},
+		"upperRight":          map[string]any{"latitude": maxLat, "longitude": maxLng},
+		"lowerLeftLatIsSet":   true,
+		"lowerLeftLongIsSet":  true,
+		"upperRightLatIsSet":  true,
+		"upperRightLongIsSet": true,
+	}
+	if v, _ := d["distanceMeter"].(float64); v == 0 {
+		d["distanceMeter"] = lastDist
+	}
+	if d["elevationGainMeter"] == nil {
+		d["elevationGainMeter"] = 0.0
+	}
+	if d["elevationLossMeter"] == nil {
+		d["elevationLossMeter"] = 0.0
+	}
+	return json.Marshal(d)
 }
 
 func (a *app) activitiesCommand() *cobra.Command {

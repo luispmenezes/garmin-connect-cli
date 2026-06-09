@@ -71,6 +71,45 @@ func activityStatsTable(data []byte, unit speedUnit) ([][]string, []string, erro
 	return rows, []string{"Type", "Splits", "Distance", "Duration", speedHeader(unit), "HR", "Ascent"}, nil
 }
 
+func firstVal(m map[string]any, keys ...string) any {
+	for _, k := range keys {
+		if v, ok := m[k]; ok && v != nil {
+			return v
+		}
+	}
+	return nil
+}
+
+func coursesTable(data []byte) ([][]string, []string, error) {
+	// The course list endpoint may return a bare array or wrap it under a key
+	// such as "coursesForUser"/"courses"; handle both.
+	var courses []map[string]any
+	if err := json.Unmarshal(data, &courses); err != nil {
+		var wrapper map[string]json.RawMessage
+		if err2 := json.Unmarshal(data, &wrapper); err2 != nil {
+			return nil, nil, err
+		}
+		for _, key := range []string{"coursesForUser", "courses", "items"} {
+			if raw, ok := wrapper[key]; ok {
+				if err2 := json.Unmarshal(raw, &courses); err2 == nil {
+					break
+				}
+			}
+		}
+	}
+	rows := make([][]string, 0, len(courses))
+	for _, c := range courses {
+		rows = append(rows, []string{
+			firstString(c, "courseId", "id"),
+			output.Truncate(firstString(c, "courseName", "name"), 32),
+			nestedString(c, "activityType", "typeKey"),
+			distanceKM(firstVal(c, "distanceInMeters", "distanceMeter", "distance")),
+			elevation(firstVal(c, "elevationGainInMeters", "elevationGainMeter", "elevationGain")),
+		})
+	}
+	return rows, []string{"ID", "Name", "Type", "Distance", "Ascent"}, nil
+}
+
 func devicesTable(data []byte) ([][]string, []string, error) {
 	var devices []map[string]any
 	if err := json.Unmarshal(data, &devices); err != nil {

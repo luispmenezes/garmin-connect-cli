@@ -96,6 +96,23 @@ garmin workouts create examples/workout-running-minimal.json
 
 The example workout is intentionally a raw Garmin payload for manual testing. Garmin may reject incomplete segment structures, and the CLI sends the file contents unchanged.
 
+Import a route file (GPX/FIT/TCX) as a course, then list and inspect it:
+
+```bash
+garmin courses import ride.gpx                      # defaults to road_biking, private
+garmin courses import trail.gpx --activity-type 5   # mountain_biking
+garmin courses list --format table
+garmin courses get COURSE_ID --pretty
+garmin courses delete COURSE_ID
+```
+
+Import is two steps under the hood: Garmin parses the file into a transient
+course, then the CLI computes the metadata the save endpoint requires (start
+point, bounding box, distance) and persists it. Elevation is filled in by
+Garmin from its own terrain data. Use `--parse-only` to inspect the parsed
+course without saving. Activity types: `1`=running, `3`=hiking,
+`5`=mountain_biking, `6`=trail_running, `10`=road_biking, `143`=gravel_cycling.
+
 Use a separate profile:
 
 ```bash
@@ -108,6 +125,7 @@ garmin --profile personal health sleep
 garmin auth login|logout|status
 garmin profile show|settings
 garmin activities list|get|splits|stats|download|upload
+garmin courses list|get|import|delete
 garmin devices list|get
 garmin health summary|sleep|stress|heart-rate|body-battery|steps|calories|weight|weight-add
 garmin health vo2max|training-readiness|training-status|hrv|fitness-age
