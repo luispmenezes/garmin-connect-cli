@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/luispmenezes/garmin-connect-cli/internal/auth"
+	"github.com/luispmenezes/garmin-connect-cli/internal/fit"
 	"github.com/luispmenezes/garmin-connect-cli/internal/garmin"
 	"github.com/luispmenezes/garmin-connect-cli/internal/output"
 	"github.com/luispmenezes/garmin-connect-cli/internal/version"
@@ -465,22 +466,72 @@ func (a *app) activitiesCommand() *cobra.Command {
 	download.Flags().StringVar(&downloadType, "type", "fit", "download type: fit, gpx, tcx, or kml")
 	download.Flags().StringVarP(&downloadOutput, "output", "o", "", "output path, or - for stdout")
 	_ = download.MarkFlagRequired("output")
+	var asDevice string
+	var fitManufacturer, fitProduct, fitSerial uint32
 	upload := &cobra.Command{
 		Use:   "upload FILE",
 		Short: "Upload an activity file",
-		Args:  cobra.ExactArgs(1),
+		Long: "Upload an activity file to Garmin Connect.\n\n" +
+			"With --as-device (or the --manufacturer/--product/--serial overrides) the FIT\n" +
+			"file's file_id is rewritten before upload so Garmin attributes the activity to\n" +
+			"that device. Attribution comes from the FIT file_id, not the upload request.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, token, err := a.api()
 			if err != nil {
 				return err
 			}
-			data, err := client.Upload(token, "/upload-service/upload/.fit", args[0])
+			content, err := os.ReadFile(args[0])
+			if err != nil {
+				return err
+			}
+			stamp := fit.Stamp{}
+			if asDevice != "" {
+				devices, err := client.GetJSON(token, garmin.DeviceListPath())
+				if err != nil {
+					return err
+				}
+				st, name, err := deviceFitStamp(devices, asDevice)
+				if err != nil {
+					return err
+				}
+				stamp = st
+				fmt.Fprintf(os.Stderr, "stamping file_id as %s (device %s)\n", name, asDevice)
+			}
+			if cmd.Flags().Changed("manufacturer") {
+				if fitManufacturer > 0xFFFF {
+					return fmt.Errorf("--manufacturer must be 0..65535")
+				}
+				m := uint16(fitManufacturer)
+				stamp.Manufacturer = &m
+			}
+			if cmd.Flags().Changed("product") {
+				if fitProduct > 0xFFFF {
+					return fmt.Errorf("--product must be 0..65535")
+				}
+				p := uint16(fitProduct)
+				stamp.Product = &p
+			}
+			if cmd.Flags().Changed("serial") {
+				stamp.Serial = &fitSerial
+			}
+			if !stamp.IsZero() {
+				content, err = fit.StampFile(content, stamp)
+				if err != nil {
+					return fmt.Errorf("stamp FIT file_id: %w", err)
+				}
+			}
+			data, err := client.UploadBytes(token, "/upload-service/upload/.fit", filepath.Base(args[0]), content)
 			if err != nil {
 				return err
 			}
 			return a.out().WriteJSON(data)
 		},
 	}
+	upload.Flags().StringVar(&asDevice, "as-device", "", "stamp the FIT file_id with this registered device's identity (deviceId/unitId)")
+	upload.Flags().Uint32Var(&fitManufacturer, "manufacturer", 0, "override FIT file_id manufacturer (1 = Garmin)")
+	upload.Flags().Uint32Var(&fitProduct, "product", 0, "override FIT file_id product code")
+	upload.Flags().Uint32Var(&fitSerial, "serial", 0, "override FIT file_id serial number")
 	cmd.AddCommand(list, get, splits, stats, download, upload)
 	return cmd
 }

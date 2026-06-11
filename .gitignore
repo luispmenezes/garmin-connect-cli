@@ -15,6 +15,11 @@
 .env.*
 !.env.example
 
+# Decompile/reverse-engineering inputs
+*.apk
+*.apkm
+*.xapk
+
 # OS/editor noise
 .DS_Store
 *.swp

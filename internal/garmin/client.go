@@ -92,21 +92,24 @@ func (c *Client) Download(token auth.OAuth2Token, path string) ([]byte, error) {
 }
 
 func (c *Client) Upload(token auth.OAuth2Token, path, file string) (json.RawMessage, error) {
+	content, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	return c.UploadBytes(token, path, filepath.Base(file), content)
+}
+
+// UploadBytes posts content as a multipart "file" field, letting callers upload
+// in-memory bytes (e.g. a FIT stamped with a device identity) under a chosen
+// filename.
+func (c *Client) UploadBytes(token auth.OAuth2Token, path, filename string, content []byte) (json.RawMessage, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", filepath.Base(file))
+	part, err := writer.CreateFormFile("file", filename)
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := io.Copy(part, f); err != nil {
-		f.Close()
-		return nil, err
-	}
-	if err := f.Close(); err != nil {
+	if _, err := part.Write(content); err != nil {
 		return nil, err
 	}
 	if err := writer.Close(); err != nil {

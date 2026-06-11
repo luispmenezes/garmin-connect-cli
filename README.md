@@ -67,6 +67,29 @@ Download an activity:
 garmin activities download ACTIVITY_ID --type fit --output activity.fit.zip
 ```
 
+Upload an activity file:
+
+```bash
+garmin activities upload activity.fit
+```
+
+Upload a FIT and have Garmin attribute it to one of your registered devices.
+Garmin derives device attribution from the FIT file's `file_id` message (not the
+upload request), so `--as-device` rewrites that message — manufacturer, product,
+and serial number — before uploading:
+
+```bash
+# Resolve manufacturer/product/serial from a registered device (its deviceId or unitId)
+garmin activities upload activity.fit --as-device 3309787599
+```
+
+Or set the `file_id` fields explicitly (these override `--as-device`, and cover
+devices that are not registered on the account):
+
+```bash
+garmin activities upload activity.fit --manufacturer 1 --product 3290 --serial 3309787599
+```
+
 Show devices:
 
 ```bash
