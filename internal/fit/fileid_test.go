@@ -172,6 +172,67 @@ func TestStampErrors(t *testing.T) {
 	}
 }
 
+func TestStampStringSerial(t *testing.T) {
+	// Build a FIT where serial_number is a 32-byte string field.
+	def := []byte{
+		0x40,       // record header: definition, local 0
+		0x00,       // reserved
+		0x00,       // architecture: little-endian
+		0x00, 0x00, // global msg num 0 (file_id)
+		0x04,             // 4 fields
+		0x03, 0x20, 0x07, // serial_number, 32, string
+		0x01, 0x02, 0x84, // manufacturer, 2, uint16
+		0x02, 0x02, 0x84, // product, 2, uint16
+		0x00, 0x01, 0x00, // type, 1, enum
+	}
+	serialBytes := []byte("3923387304")
+	serialStr := make([]byte, 32)
+	copy(serialStr, serialBytes)
+	data := append([]byte{0x00}, serialStr...)
+	data = binary.LittleEndian.AppendUint16(data, 1)
+	data = binary.LittleEndian.AppendUint16(data, 3290)
+	data = append(data, 0x04) // type = activity
+
+	body := append(def, data...)
+	header := make([]byte, 14)
+	header[0] = 14
+	header[1] = 0x10
+	binary.LittleEndian.PutUint32(header[4:], uint32(len(body)))
+	copy(header[8:], ".FIT")
+	binary.LittleEndian.PutUint16(header[12:], crc16(header[:12]))
+	file := append(header, body...)
+	file = binary.LittleEndian.AppendUint16(file, crc16(file))
+	assertCRCValid(t, file)
+
+	// Stamp the serial number.
+	out, err := StampFile(file, Stamp{Serial: u32(1234567890)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCRCValid(t, out)
+
+	// Verify serial was written as uint32 in the first 4 bytes.
+	dataStart := int(file[0]) + len(def) + 1
+	if got := binary.LittleEndian.Uint32(out[dataStart:]); got != 1234567890 {
+		t.Fatalf("serial not patched: got %d, want %d", got, 1234567890)
+	}
+	// Verify remaining 28 bytes are zeroed.
+	for i := 4; i < 32; i++ {
+		if out[dataStart+i] != 0 {
+			t.Fatalf("byte %d of serial field not zeroed: got 0x%02x", i, out[dataStart+i])
+		}
+	}
+	// Verify manufacturer and product unchanged.
+	mfgStart := dataStart + 32
+	if mfg := binary.LittleEndian.Uint16(out[mfgStart:]); mfg != 1 {
+		t.Fatalf("manufacturer changed: got %d, want 1", mfg)
+	}
+	prodStart := mfgStart + 2
+	if prod := binary.LittleEndian.Uint16(out[prodStart:]); prod != 3290 {
+		t.Fatalf("product changed: got %d, want 3290", prod)
+	}
+}
+
 func TestStampMissingField(t *testing.T) {
 	// file_id with only manufacturer + type, no serial field.
 	def := []byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01, 0x02, 0x84, 0x00, 0x01, 0x00}

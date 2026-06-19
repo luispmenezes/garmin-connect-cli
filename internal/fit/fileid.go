@@ -157,7 +157,11 @@ func StampFile(data []byte, s Stamp) ([]byte, error) {
 			return fmt.Errorf("file_id has no field %d to set", fieldNum)
 		}
 		if loc.size != wantSize {
-			return fmt.Errorf("file_id field %d has unexpected size %d (want %d)", fieldNum, loc.size, wantSize)
+			// Some Garmin devices store serial_number as a 32-byte string
+			// rather than a 4-byte uint32. Accept it.
+			if fieldNum != fieldSerialNumber || loc.size != 32 {
+				return fmt.Errorf("file_id field %d has unexpected size %d (want %d)", fieldNum, loc.size, wantSize)
+			}
 		}
 		write(out[dataStart+loc.offset : dataStart+loc.offset+wantSize])
 		return nil
@@ -174,6 +178,12 @@ func StampFile(data []byte, s Stamp) ([]byte, error) {
 		}
 	}
 	if s.Serial != nil {
+		if loc, ok := locs[fieldSerialNumber]; ok && loc.size == 32 {
+			// Zero the remaining 28 bytes of the 32-byte string field.
+			for i := 4; i < loc.size; i++ {
+				out[dataStart+loc.offset+i] = 0
+			}
+		}
 		if err := patch(fieldSerialNumber, 4, func(b []byte) { order.PutUint32(b, *s.Serial) }); err != nil {
 			return nil, err
 		}
